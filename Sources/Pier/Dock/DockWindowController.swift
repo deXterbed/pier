@@ -336,7 +336,32 @@ final class DockWindowController: NSObject {
             menu.addItem(.separator())
         }
 
-        add(to: menu, "Add App…", "plus.app") { [weak self] in self?.addApp() }
+        // A list of what's installed, rather than a file picker — an accessory app's
+        // modal panels have a habit of opening behind whatever you were looking at.
+        let appsMenu = NSMenu()
+        for url in InstalledApps.all() {
+            let entry = NSMenuItem(
+                title: url.deletingPathExtension().lastPathComponent,
+                action: #selector(runBlock(_:)),
+                keyEquivalent: ""
+            )
+            entry.target = self
+            entry.representedObject = Block { [weak self] in
+                self?.addItems([InstalledApps.item(for: url)])
+            }
+            let icon = NSWorkspace.shared.icon(forFile: url.path)
+            icon.size = NSSize(width: 16, height: 16)
+            entry.image = icon
+            appsMenu.addItem(entry)
+        }
+        appsMenu.addItem(.separator())
+        add(to: appsMenu, "Choose…", "folder") { [weak self] in self?.addApp() }
+
+        let appsItem = NSMenuItem(title: "Add App", action: nil, keyEquivalent: "")
+        appsItem.image = NSImage(systemSymbolName: "plus.app", accessibilityDescription: nil)
+        appsItem.submenu = appsMenu
+        menu.addItem(appsItem)
+
         add(to: menu, "Add Folder…", "folder.badge.plus") { [weak self] in self?.addFolder() }
 
         let widgets = NSMenu()
@@ -411,49 +436,26 @@ final class DockWindowController: NSObject {
 
     // MARK: - Adding things
 
-    private func addApp() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.application]
-        panel.directoryURL = URL(fileURLWithPath: "/Applications")
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.prompt = "Add"
-        NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK else { return }
-
-        let items = panel.urls.map {
-            DockItem.app(at: $0, bundleIdentifier: AppCatalog.shared.bundleIdentifier(forAppAt: $0))
-        }
+    func addItems(_ items: [DockItem]) {
+        guard !items.isEmpty else { return }
         store.update(id: dockID) { $0.add(contentsOf: items) }
         host?.dockChanged(self)
     }
 
-    private func addFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = true
-        panel.prompt = "Add"
-        NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK else { return }
+    private func addApp() {
+        addItems(OpenPanels.chooseApps().map(InstalledApps.item(for:)))
+    }
 
-        store.update(id: dockID) { $0.add(contentsOf: panel.urls.map(DockItem.folder(at:))) }
-        host?.dockChanged(self)
+    private func addFolder() {
+        addItems(OpenPanels.chooseFolders().map(DockItem.folder(at:)))
     }
 
     private func addWidget(_ kind: WidgetKind) {
-        store.update(id: dockID) { $0.add(.widget(kind)) }
-        host?.dockChanged(self)
+        addItems([.widget(kind)])
     }
 
     private func changeIcon(of item: DockItem) {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Use Icon"
-        NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-
+        guard let url = OpenPanels.chooseImage() else { return }
         store.update(id: dockID) { dock in
             guard let index = dock.items.firstIndex(where: { $0.id == item.id }) else { return }
             dock.items[index].customIconPath = url.path

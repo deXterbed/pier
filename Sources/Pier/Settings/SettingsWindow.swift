@@ -213,9 +213,9 @@ private struct DockEditor: View {
                 Toggle("Also show apps that are running", isOn: runningBinding)
             }
 
-            Section("Contents") {
+            Section {
                 if dock.items.isEmpty {
-                    Text("Empty. Drag apps, folders or files straight onto the dock, or right-click it.")
+                    Text("Empty. Add something below, drag apps and folders straight onto the dock, or right-click the dock itself.")
                         .font(.system(size: 11.5))
                         .foregroundStyle(.secondary)
                 } else {
@@ -234,9 +234,46 @@ private struct DockEditor: View {
                         }
                     }
                 }
+            } header: {
+                HStack {
+                    Text("Contents")
+                    Spacer()
+                    addMenu
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// The reliable way to fill a dock: a plain list of what's installed, with no modal
+    /// panel involved at all.
+    private var addMenu: some View {
+        Menu {
+            Menu("Application") {
+                ForEach(InstalledApps.all(), id: \.self) { url in
+                    Button(url.deletingPathExtension().lastPathComponent) {
+                        update { $0.add(InstalledApps.item(for: url)) }
+                    }
+                }
+                Divider()
+                Button("Choose…") {
+                    let picked = OpenPanels.chooseApps().map(InstalledApps.item(for:))
+                    update { $0.add(contentsOf: picked) }
+                }
+            }
+            Button("Folder…") {
+                let picked = OpenPanels.chooseFolders().map(DockItem.folder(at:))
+                update { $0.add(contentsOf: picked) }
+            }
+            Divider()
+            ForEach(WidgetKind.allCases, id: \.self) { kind in
+                Button(kind.title) { update { $0.add(.widget(kind)) } }
+            }
+        } label: {
+            Label("Add", systemImage: "plus")
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
     }
 
     // MARK: - Bindings
