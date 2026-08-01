@@ -1,0 +1,5 @@
+.build/
+Pier.app/
+*.icns
+*.iconset/
+.DS_Store
