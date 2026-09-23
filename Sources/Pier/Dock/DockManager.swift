@@ -45,6 +45,16 @@ final class DockManager: NSObject, DockWindowControllerHost, ObservableObject {
             MainActor.assumeIsolated { self?.rebuild() }
         }
 
+        // The multi-display rule can be switched off, which changes whether each dock has a
+        // screen to sit on at all.
+        NotificationCenter.default.addObserver(
+            forName: .pierPreferencesChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.rebuild() }
+        }
+
         // Full-screen state has no notification worth subscribing to, so it's sampled.
         let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateFullscreenVisibility() }
@@ -137,10 +147,10 @@ final class DockManager: NSObject, DockWindowControllerHost, ObservableObject {
     }
 
     func screen(for dock: Dock) -> NSScreen? {
-        // Pier is a multi-display tool: on a single display it has nothing to add, so hide
-        // every dock and let the system Dock do the job. Returning nil reuses the existing
-        // unplugged-monitor path, which already hides the panel.
-        guard NSScreen.screens.count >= 2 else { return nil }
+        // Optionally stand down on a single display, where Pier has nothing to add over the
+        // system Dock. Returning nil reuses the existing unplugged-monitor path, which
+        // already hides the panel.
+        if prefs.onlyWithMultipleDisplays, NSScreen.screens.count < 2 { return nil }
         let connected = connectedScreens()
         guard let wanted = dock.screen else { return NSScreen.main ?? connected.first?.screen }
         guard let resolved = ScreenIdentity.resolve(

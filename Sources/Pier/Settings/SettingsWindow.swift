@@ -39,13 +39,18 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 }
 
+private enum SettingsTarget: Hashable {
+    case general
+    case dock(UUID)
+}
+
 struct SettingsView: View {
     @ObservedObject var manager: DockManager
-    @State private var selection: UUID?
+    @State private var selection: SettingsTarget?
 
     init(manager: DockManager, initialSelection: UUID?) {
         self.manager = manager
-        _selection = State(initialValue: initialSelection ?? manager.store.docks.first?.id)
+        _selection = State(initialValue: initialSelection.map { SettingsTarget.dock($0) } ?? .general)
     }
 
     private var docks: [Dock] { manager.store.docks }
@@ -53,9 +58,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
+                Section("App") {
+                    Label("General", systemImage: "gearshape")
+                        .tag(SettingsTarget.general)
+                }
                 Section("Docks") {
                     ForEach(docks) { dock in
-                        DockRow(dock: dock, manager: manager).tag(dock.id)
+                        DockRow(dock: dock, manager: manager).tag(SettingsTarget.dock(dock.id))
                     }
                 }
             }
@@ -63,41 +72,88 @@ struct SettingsView: View {
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 6) {
                     Button {
-                        selection = manager.addDock().id
+                        selection = .dock(manager.addDock().id)
                     } label: {
                         Label("New Dock", systemImage: "plus")
                     }
                     Spacer()
                     Button {
-                        guard let selection else { return }
-                        manager.removeDock(id: selection)
-                        self.selection = manager.store.docks.first?.id
+                        guard case .dock(let id)? = selection else { return }
+                        manager.removeDock(id: id)
+                        self.selection = manager.store.docks.first.map { SettingsTarget.dock($0.id) }
                     } label: {
                         Image(systemName: "minus")
                     }
-                    .disabled(selection == nil || docks.count <= 1)
+                    .disabled(!isDockSelected)
                 }
                 .buttonStyle(.borderless)
                 .padding(10)
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220)
         } detail: {
-            if let selection, let dock = docks.first(where: { $0.id == selection }) {
-                DockEditor(dock: dock, manager: manager)
-                    .id(dock.id)
-            } else {
-                VStack(spacing: 8) {
-                    Image(systemName: "rectangle.stack")
-                        .font(.system(size: 34, weight: .light))
-                    Text("No dock selected").font(.system(size: 15, weight: .medium))
-                    Text("Pick a dock on the left, or make a new one.")
-                        .font(.system(size: 12))
-                }
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
+            detailView
         }
         .frame(minWidth: 720, minHeight: 520)
+    }
+
+    private var isDockSelected: Bool {
+        if case .dock? = selection { return true }
+        return false
+    }
+
+    @ViewBuilder
+    private var detailView: some View {
+        if case .dock(let id)? = selection, let dock = docks.first(where: { $0.id == id }) {
+            DockEditor(dock: dock, manager: manager)
+                .id(dock.id)
+        } else if selection == .general {
+            GeneralSettings()
+        } else {
+            emptyState
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "rectangle.stack")
+                .font(.system(size: 34, weight: .light))
+            Text("No dock selected").font(.system(size: 15, weight: .medium))
+            Text("Pick a dock on the left, or make a new one.")
+                .font(.system(size: 12))
+        }
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - General
+
+private struct GeneralSettings: View {
+    @State private var onlyWithMultipleDisplays = Preferences.shared.onlyWithMultipleDisplays
+
+    var body: some View {
+        Form {
+            Section("Displays") {
+                Toggle(
+                    "Only show docks when two or more displays are connected",
+                    isOn: onlyWithMultipleDisplaysBinding
+                )
+                Text("With this on, Pier stands down on a single display and brings the docks back as soon as a second one is connected. Off means each dock shows whenever its own display is present, however many there are.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private var onlyWithMultipleDisplaysBinding: Binding<Bool> {
+        Binding(
+            get: { onlyWithMultipleDisplays },
+            set: { newValue in
+                onlyWithMultipleDisplays = newValue
+                Preferences.shared.onlyWithMultipleDisplays = newValue
+            }
+        )
     }
 }
 

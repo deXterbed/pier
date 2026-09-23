@@ -17,6 +17,7 @@ public final class Preferences: @unchecked Sendable {
             Key.showMenuBarIcon: true,
             Key.animateLaunches: true,
             Key.confirmedFirstRun: false,
+            Key.onlyWithMultipleDisplays: true,
         ])
     }
 
@@ -25,6 +26,7 @@ public final class Preferences: @unchecked Sendable {
         static let showMenuBarIcon = "showMenuBarIcon"
         static let animateLaunches = "animateLaunches"
         static let confirmedFirstRun = "confirmedFirstRun"
+        static let onlyWithMultipleDisplays = "onlyWithMultipleDisplays"
     }
 
     public var showMenuBarIcon: Bool {
@@ -36,6 +38,14 @@ public final class Preferences: @unchecked Sendable {
     public var animateLaunches: Bool {
         get { defaults.bool(forKey: Key.animateLaunches) }
         set { write(newValue, Key.animateLaunches) }
+    }
+
+    /// On by default: on a single display Pier has nothing to add over the system Dock, so
+    /// it stands down and comes back when a second display is connected. Off means every
+    /// dock shows whenever its own display is present, however many there are.
+    public var onlyWithMultipleDisplays: Bool {
+        get { defaults.bool(forKey: Key.onlyWithMultipleDisplays) }
+        set { write(newValue, Key.onlyWithMultipleDisplays) }
     }
 
     public var confirmedFirstRun: Bool {
