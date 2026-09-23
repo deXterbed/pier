@@ -130,6 +130,7 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @State private var onlyWithMultipleDisplays = Preferences.shared.onlyWithMultipleDisplays
+    @State private var startAtLogin = LaunchAtLogin.isEnabled
 
     var body: some View {
         Form {
@@ -142,8 +143,25 @@ private struct GeneralSettings: View {
                     .font(.system(size: 11.5))
                     .foregroundStyle(.secondary)
             }
+
+            Section("Startup") {
+                Toggle("Start Pier at login", isOn: startAtLoginBinding)
+                Text("Adds Pier as a login item so the docks come back after a restart. It points at this bundle, so keep the app where it is.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private var startAtLoginBinding: Binding<Bool> {
+        Binding(
+            get: { startAtLogin },
+            set: { newValue in
+                startAtLogin = newValue
+                LaunchAtLogin.setEnabled(newValue)
+            }
+        )
     }
 
     private var onlyWithMultipleDisplaysBinding: Binding<Bool> {
