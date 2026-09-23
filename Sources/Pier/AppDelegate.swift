@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        LaunchAtLogin.migrateFromLegacyAgent()
+
         manager.onChange = { [weak self] in self?.statusItem.refresh() }
         manager.onRequestSettings = { [weak self] id in self?.settings.show(selecting: id) }
         manager.start()
