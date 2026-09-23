@@ -79,6 +79,15 @@ final class StatusItemController: NSObject {
         settings.target = self
         menu.addItem(settings)
 
+        let login = NSMenuItem(
+            title: "Start at Login",
+            action: #selector(toggleStartAtLogin),
+            keyEquivalent: ""
+        )
+        login.target = self
+        login.state = LaunchAtLogin.isEnabled ? .on : .off
+        menu.addItem(login)
+
         menu.addItem(.separator())
 
         let quit = NSMenuItem(title: "Quit Pier", action: #selector(quit), keyEquivalent: "q")
@@ -107,6 +116,11 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func openSettings() { onOpenSettings?(nil) }
+
+    @objc private func toggleStartAtLogin() {
+        LaunchAtLogin.setEnabled(!LaunchAtLogin.isEnabled)
+        refresh()
+    }
     @objc private func quit() { onQuit?() }
 
     // MARK: - Menu plumbing
