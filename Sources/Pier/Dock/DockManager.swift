@@ -137,6 +137,10 @@ final class DockManager: NSObject, DockWindowControllerHost, ObservableObject {
     }
 
     func screen(for dock: Dock) -> NSScreen? {
+        // Pier is a multi-display tool: on a single display it has nothing to add, so hide
+        // every dock and let the system Dock do the job. Returning nil reuses the existing
+        // unplugged-monitor path, which already hides the panel.
+        guard NSScreen.screens.count >= 2 else { return nil }
         let connected = connectedScreens()
         guard let wanted = dock.screen else { return NSScreen.main ?? connected.first?.screen }
         guard let resolved = ScreenIdentity.resolve(
@@ -217,7 +221,12 @@ final class DockManager: NSObject, DockWindowControllerHost, ObservableObject {
         let covered = FullscreenWatcher.screensWithFullscreenWindows()
         for controller in controllers {
             let dock = controller.dock
-            guard dock.behavior.hideOnFullscreen, let screen = screen(for: dock) else {
+            guard let screen = screen(for: dock) else {
+                // Nothing to sit on (unplugged, or fewer than two displays): leave it
+                // hidden rather than forcing the panel back on screen.
+                continue
+            }
+            guard dock.behavior.hideOnFullscreen else {
                 controller.setHiddenForFullscreen(false)
                 continue
             }
