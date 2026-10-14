@@ -17,6 +17,9 @@ final class AppCatalog: ObservableObject {
 
     private var iconCache: [String: NSImage] = [:]
 
+    /// Called when the set of running apps changes, so docks showing running apps can redraw.
+    var onRunningChange: (() -> Void)?
+
     private init() {
         refreshRunning()
 
@@ -38,8 +41,13 @@ final class AppCatalog: ObservableObject {
 
     private func refreshRunning() {
         let apps = NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
-        runningBundleIDs = Set(apps.compactMap(\.bundleIdentifier))
+        let ids = Set(apps.compactMap(\.bundleIdentifier))
+        // Only a launch or a quit changes what belongs on a dock; activating an app (which also
+        // lands here) must not make every dock relayout.
+        let changed = ids != runningBundleIDs
+        runningBundleIDs = ids
         frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        if changed { onRunningChange?() }
     }
 
     // MARK: - Identity
@@ -189,12 +197,30 @@ enum SystemDockReader {
     /// Running apps that aren't already on the dock — the "show what's open" option.
     @MainActor
     static func runningItems(excluding existing: [DockItem]) -> [DockItem] {
-        let known = Set(existing.compactMap(\.bundleIdentifier))
+        // Identity has to be resolved the way AppCatalog.isRunning does it. Items created from a
+        // path, which is most of them (mirroring, dragging an app in, a hand-written config),
+        // carry no bundle identifier, so matching on that alone lets every pinned app through
+        // a second time.
+        var known = Set(existing.compactMap { item -> String? in
+            if let bundleID = item.bundleIdentifier { return bundleID }
+            guard let path = item.path else { return nil }
+            return Bundle(path: path)?.bundleIdentifier
+        })
+        // The Finder widget is Finder, so don't add a second Finder beside it.
+        if existing.contains(where: { $0.widget == .finder }) {
+            known.insert("com.apple.finder")
+        }
+
+        // Pier is a regular app while its settings window is open, and must not appear on its
+        // own dock.
+        let ownBundleID = Bundle.main.bundleIdentifier
+
         return NSWorkspace.shared.runningApplications
             .filter { $0.activationPolicy == .regular }
             .compactMap { app -> DockItem? in
                 guard let url = app.bundleURL, let bundleID = app.bundleIdentifier,
-                      !known.contains(bundleID)
+                      !known.contains(bundleID),
+                      bundleID != ownBundleID
                 else { return nil }
                 return .app(at: url, bundleIdentifier: bundleID, title: app.localizedName)
             }

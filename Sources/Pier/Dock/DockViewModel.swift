@@ -22,7 +22,13 @@ final class DockViewModel: ObservableObject {
         self.dock = dock
     }
 
-    var items: [DockItem] { dock.items }
+    /// Running apps shown after the dock's own items without being stored: an app appears when
+    /// it launches and goes when it quits. Recomputed on every refresh, never persisted.
+    @Published private(set) var runningExtras: [DockItem] = []
+
+    /// Everything to draw and hit-test: the dock's own items, then any running apps being shown.
+    var items: [DockItem] { dock.items + runningExtras }
+
     var layout: DockLayout { dock.layout }
     var appearance: DockAppearance { dock.appearance.sanitised }
 
@@ -62,5 +68,24 @@ final class DockViewModel: ObservableObject {
             hovered: hoveredPosition,
             itemLength: appearance.iconSize
         )
+    }
+
+    /// Recomputes the running extras. Called when the dock changes and when the set of running
+    /// apps changes. Ids are carried over between refreshes so SwiftUI reuses each tile rather
+    /// than rebuilding it, which would restart its animations on every app launch.
+    func refreshRunningExtras() {
+        guard dock.behavior.showsRunningApps else {
+            if !runningExtras.isEmpty { runningExtras = [] }
+            return
+        }
+        let extras = SystemDockReader.runningItems(excluding: dock.items)
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+        runningExtras = extras.map { item in
+            var item = item
+            if let existing = runningExtras.first(where: { $0.bundleIdentifier == item.bundleIdentifier }) {
+                item.id = existing.id
+            }
+            return item
+        }
     }
 }

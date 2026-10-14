@@ -50,6 +50,7 @@ final class DockWindowController: NSObject {
         surface.controller = self
         panel.contentView = surface
 
+        model.refreshRunningExtras()
         relayout()
     }
 
@@ -70,7 +71,7 @@ final class DockWindowController: NSObject {
     private var cardSize: CGSize {
         dock.behavior.collapsed
             ? model.layout.collapsedCardSize()
-            : model.layout.cardSize(for: dock.items)
+            : model.layout.cardSize(for: model.items)
     }
 
     /// Re-seats the window for the current contents, placement and screen.
@@ -109,6 +110,7 @@ final class DockWindowController: NSObject {
 
     func refresh(with dock: Dock) {
         model.dock = dock
+        model.refreshRunningExtras()
         relayout()
     }
 
@@ -172,7 +174,7 @@ final class DockWindowController: NSObject {
 
     func itemIndex(at point: CGPoint) -> Int? {
         guard !dock.behavior.collapsed else { return nil }
-        return model.layout.index(at: point, items: dock.items)
+        return model.layout.index(at: point, items: model.items)
     }
 
     func pressed(index: Int?) {
@@ -186,8 +188,8 @@ final class DockWindowController: NSObject {
             toggleCollapsed()
             return
         }
-        guard index < dock.items.count else { return }
-        let item = dock.items[index]
+        guard index < model.items.count else { return }
+        let item = model.items[index]
         guard item.isInteractive else { return }
 
         switch item.kind {
@@ -221,9 +223,11 @@ final class DockWindowController: NSObject {
     // MARK: - Dragging tiles
 
     func dragItem(at index: Int, to point: CGPoint) {
+        // Running extras are drawn and clicked here, but not owned, so they don't reorder.
+        guard index < dock.items.count else { return }
         model.draggingIndex = index
         pendingDragIndex = index
-        model.insertionIndex = model.layout.insertionIndex(at: point, items: dock.items)
+        model.insertionIndex = model.layout.insertionIndex(at: point, items: model.items)
     }
 
     func finishItemDrag(at point: CGPoint, inside: Bool) {
@@ -242,7 +246,7 @@ final class DockWindowController: NSObject {
             return
         }
 
-        let destination = model.layout.insertionIndex(at: point, items: dock.items)
+        let destination = model.layout.insertionIndex(at: point, items: model.items)
         store.update(id: dockID) { $0.move(id: item.id, to: destination) }
         host?.dockChanged(self)
     }
@@ -273,12 +277,12 @@ final class DockWindowController: NSObject {
 
     func dropMoved(to point: CGPoint) {
         model.isDropTargeted = true
-        if let index = itemIndex(at: point), dock.items[index].acceptsDrops {
+        if let index = itemIndex(at: point), index < model.items.count, model.items[index].acceptsDrops {
             model.dropTargetIndex = index
             model.insertionIndex = nil
         } else {
             model.dropTargetIndex = nil
-            model.insertionIndex = model.layout.insertionIndex(at: point, items: dock.items)
+            model.insertionIndex = model.layout.insertionIndex(at: point, items: model.items)
         }
     }
 
@@ -300,8 +304,8 @@ final class DockWindowController: NSObject {
         guard !urls.isEmpty else { return false }
 
         // Onto an app or folder: hand the files over to it.
-        if let targetIndex, targetIndex < dock.items.count {
-            let target = dock.items[targetIndex]
+        if let targetIndex, targetIndex < model.items.count {
+            let target = model.items[targetIndex]
             if target.widget == .trash {
                 AppCatalog.shared.moveToTrash(urls)
             } else {

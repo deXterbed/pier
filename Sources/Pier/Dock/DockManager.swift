@@ -34,6 +34,11 @@ final class DockManager: NSObject, DockWindowControllerHost, ObservableObject {
         store.onChange = { [weak self] _ in
             self?.objectWillChange.send()
         }
+
+        // A dock that shows running apps has to redraw when one launches or quits.
+        AppCatalog.shared.onRunningChange = { [weak self] in
+            self?.refreshAll()
+        }
         if store.docks.isEmpty {
             store.add(DockManager.starterDock())
         }

@@ -396,12 +396,7 @@ private struct DockEditor: View {
         Binding(
             get: { store.dock(id: dock.id)?.behavior.showsRunningApps ?? dock.behavior.showsRunningApps },
             set: { value in
-                update { dock in
-                    dock.behavior.showsRunningApps = value
-                    if value {
-                        dock.add(contentsOf: SystemDockReader.runningItems(excluding: dock.items))
-                    }
-                }
+                update { $0.behavior.showsRunningApps = value }
             }
         )
     }
