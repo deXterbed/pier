@@ -27,6 +27,13 @@ final class DockManager: NSObject, DockWindowControllerHost, ObservableObject {
 
     func start() {
         store.load()
+
+        // The settings window reads its controls straight from the store, so a mutation has to
+        // invalidate the SwiftUI views that observe this manager. Without this, flipping a
+        // toggle writes the new value but the control stays where it was.
+        store.onChange = { [weak self] _ in
+            self?.objectWillChange.send()
+        }
         if store.docks.isEmpty {
             store.add(DockManager.starterDock())
         }

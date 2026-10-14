@@ -382,7 +382,7 @@ private struct DockEditor: View {
     /// as a setting — the icons have to appear the moment it's switched on.
     private var mirrorBinding: Binding<Bool> {
         Binding(
-            get: { dock.behavior.mirrorsSystemDock },
+            get: { store.dock(id: dock.id)?.behavior.mirrorsSystemDock ?? dock.behavior.mirrorsSystemDock },
             set: { value in
                 update {
                     $0.behavior.mirrorsSystemDock = value
@@ -394,7 +394,7 @@ private struct DockEditor: View {
 
     private var runningBinding: Binding<Bool> {
         Binding(
-            get: { dock.behavior.showsRunningApps },
+            get: { store.dock(id: dock.id)?.behavior.showsRunningApps ?? dock.behavior.showsRunningApps },
             set: { value in
                 update { dock in
                     dock.behavior.showsRunningApps = value
