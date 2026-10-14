@@ -20,6 +20,11 @@ final class AppCatalog: ObservableObject {
     /// Called when the set of running apps changes, so docks showing running apps can redraw.
     var onRunningChange: (() -> Void)?
 
+    /// Badge text per resolved app path, read from the Dock. Empty unless the setting is on and
+    /// Accessibility has been granted.
+    @Published private(set) var badges: [String: String] = [:]
+    private var badgeTimer: Timer?
+
     private init() {
         refreshRunning()
 
@@ -37,6 +42,45 @@ final class AppCatalog: ObservableObject {
                 MainActor.assumeIsolated { self?.refreshRunning() }
             }
         }
+
+        NotificationCenter.default.addObserver(
+            forName: .pierPreferencesChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.startBadgePolling() }
+        }
+        startBadgePolling()
+    }
+
+    // MARK: - Badges
+
+    /// Badges can only be read, never observed: the Dock offers no notification when one
+    /// changes, so this polls while the setting is on.
+    func startBadgePolling() {
+        badgeTimer?.invalidate()
+        badgeTimer = nil
+
+        guard Preferences.shared.notificationBadges else {
+            refreshBadges()
+            return
+        }
+        let timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshBadges() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        badgeTimer = timer
+        refreshBadges()
+    }
+
+    func refreshBadges() {
+        let fresh = Preferences.shared.notificationBadges ? NotificationBadges.read() : [:]
+        if fresh != badges { badges = fresh }
+    }
+
+    func badge(for item: DockItem) -> String? {
+        guard let path = item.path else { return nil }
+        return badges[NotificationBadges.normalizedPath(path)]
     }
 
     private func refreshRunning() {

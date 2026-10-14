@@ -18,6 +18,7 @@ public final class Preferences: @unchecked Sendable {
             Key.animateLaunches: true,
             Key.confirmedFirstRun: false,
             Key.onlyWithMultipleDisplays: true,
+            Key.notificationBadges: false,
         ])
     }
 
@@ -27,6 +28,7 @@ public final class Preferences: @unchecked Sendable {
         static let animateLaunches = "animateLaunches"
         static let confirmedFirstRun = "confirmedFirstRun"
         static let onlyWithMultipleDisplays = "onlyWithMultipleDisplays"
+        static let notificationBadges = "notificationBadges"
     }
 
     public var showMenuBarIcon: Bool {
@@ -46,6 +48,13 @@ public final class Preferences: @unchecked Sendable {
     public var onlyWithMultipleDisplays: Bool {
         get { defaults.bool(forKey: Key.onlyWithMultipleDisplays) }
         set { write(newValue, Key.onlyWithMultipleDisplays) }
+    }
+
+    /// Off by default: reading badges means asking for Accessibility, and this app otherwise
+    /// asks for nothing.
+    public var notificationBadges: Bool {
+        get { defaults.bool(forKey: Key.notificationBadges) }
+        set { write(newValue, Key.notificationBadges) }
     }
 
     public var confirmedFirstRun: Bool {

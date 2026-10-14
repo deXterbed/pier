@@ -131,6 +131,7 @@ struct SettingsView: View {
 private struct GeneralSettings: View {
     @State private var onlyWithMultipleDisplays = Preferences.shared.onlyWithMultipleDisplays
     @State private var startAtLogin = LaunchAtLogin.isEnabled
+    @State private var notificationBadges = Preferences.shared.notificationBadges
 
     var body: some View {
         Form {
@@ -144,6 +145,15 @@ private struct GeneralSettings: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Notifications") {
+                Toggle("Show notification badges", isOn: badgesBinding)
+                Text(notificationBadges
+                    ? "Badges are read from the Dock, the only place macOS keeps them, so if they stay blank grant Pier Accessibility in System Settings > Privacy & Security > Accessibility."
+                    : "Reads unread counts from the Dock's notification badges. That needs Accessibility permission, so it stays off until you turn it on.")
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Startup") {
                 Toggle("Start Pier at login", isOn: startAtLoginBinding)
                 Text("Adds Pier as a login item so the docks come back after a restart. It points at this bundle, so keep the app where it is.")
@@ -152,6 +162,20 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    private var badgesBinding: Binding<Bool> {
+        Binding(
+            get: { notificationBadges },
+            set: { newValue in
+                notificationBadges = newValue
+                Preferences.shared.notificationBadges = newValue
+                if newValue, !NotificationBadges.isTrusted {
+                    NotificationBadges.requestTrust()
+                }
+                AppCatalog.shared.startBadgePolling()
+            }
+        )
     }
 
     private var startAtLoginBinding: Binding<Bool> {

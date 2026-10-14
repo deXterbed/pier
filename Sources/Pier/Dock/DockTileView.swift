@@ -38,6 +38,12 @@ struct DockTileView: View {
                     .padding(max(1, side * 0.02))
             }
         }
+        .overlay(alignment: .topTrailing) {
+            if let badge = catalog.badge(for: item) {
+                BadgeLabel(text: badge, side: side)
+                    .offset(x: side * 0.09, y: -side * 0.09)
+            }
+        }
         .offset(y: isLaunching ? -side * 0.18 : 0)
         .animation(
             isLaunching
@@ -124,6 +130,29 @@ private struct RunningDot: View {
             .fill(Color.primary.opacity(frontmost ? 0.95 : 0.55))
             .frame(width: size, height: size)
             .shadow(color: .black.opacity(0.3), radius: 1)
+    }
+}
+
+/// The unread pill, drawn where the real Dock draws it: over the icon's top-right corner.
+private struct BadgeLabel: View {
+    let text: String
+    let side: CGFloat
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: max(8, side * 0.30), weight: .semibold))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, max(4, side * 0.12))
+            .padding(.vertical, max(1, side * 0.03))
+            .frame(minWidth: side * 0.40)
+            .background {
+                Capsule(style: .continuous)
+                    .fill(Color(nsColor: .systemRed))
+            }
+            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
+            .allowsHitTesting(false)
     }
 }
 
