@@ -41,7 +41,7 @@ struct DockTileView: View {
         .overlay(alignment: .topTrailing) {
             if let badge = catalog.badge(for: item) {
                 BadgeLabel(text: badge, side: side)
-                    .offset(x: side * 0.09, y: -side * 0.09)
+                    .offset(x: side * 0.04, y: -side * 0.04)
             }
         }
         .offset(y: isLaunching ? -side * 0.18 : 0)
@@ -140,18 +140,18 @@ private struct BadgeLabel: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: max(8, side * 0.30), weight: .semibold))
+            .font(.system(size: max(7, side * 0.22), weight: .semibold))
             .monospacedDigit()
             .foregroundStyle(.white)
             .lineLimit(1)
-            .padding(.horizontal, max(4, side * 0.12))
-            .padding(.vertical, max(1, side * 0.03))
-            .frame(minWidth: side * 0.40)
+            .padding(.horizontal, max(3, side * 0.07))
+            .padding(.vertical, max(0.5, side * 0.012))
+            .frame(minWidth: side * 0.28)
             .background {
                 Capsule(style: .continuous)
                     .fill(Color(nsColor: .systemRed))
             }
-            .shadow(color: .black.opacity(0.35), radius: 1.5, y: 0.5)
+            .shadow(color: .black.opacity(0.30), radius: 1, y: 0.5)
             .allowsHitTesting(false)
     }
 }
