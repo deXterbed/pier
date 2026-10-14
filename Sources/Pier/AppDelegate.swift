@@ -26,6 +26,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         LaunchAtLogin.migrateFromLegacyAgent()
 
+        // An ad-hoc signed app is pinned to its exact code hash by TCC, so a rebuild invalidates
+        // an Accessibility grant that was already approved. Asking again at launch re-registers
+        // the current build instead of leaving a stale "allowed" entry that does nothing.
+        if prefs.notificationBadges, !NotificationBadges.isTrusted {
+            NotificationBadges.requestTrust()
+        }
+
         manager.onChange = { [weak self] in self?.statusItem.refresh() }
         manager.onRequestSettings = { [weak self] id in self?.settings.show(selecting: id) }
         manager.start()
