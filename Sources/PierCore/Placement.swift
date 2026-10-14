@@ -112,9 +112,12 @@ public struct DockPlacement: Codable, Hashable, Sendable {
         return CGRect(origin: origin, size: contentSize).clamped(to: visible)
     }
 
-    /// Where the dock hides to: just past the edge it belongs to, still on the same axis.
-    /// A floating dock leaves by its nearest edge, since it has no other opinion.
-    public func hiddenFrame(contentSize: CGSize, in visible: CGRect, peek: Double = 3) -> CGRect {
+    /// Where the dock hides to: past the edge it belongs to, still on the same axis. `peek` is
+    /// how much of the card stays on screen, and it is zero on purpose: the window is
+    /// transparent outside the card and the shadow is drawn on the card itself, so anything
+    /// left on screen is a visible sliver of dock at the edge. A floating dock leaves by its
+    /// nearest edge, since it has no other opinion.
+    public func hiddenFrame(contentSize: CGSize, in visible: CGRect, peek: Double = 0) -> CGRect {
         let shown = frame(contentSize: contentSize, in: visible)
         switch resolvedHidingEdge(for: shown, in: visible) {
         case .bottom:
