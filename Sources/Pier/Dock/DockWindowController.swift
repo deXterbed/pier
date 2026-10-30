@@ -83,12 +83,27 @@ final class DockWindowController: NSObject {
 
         let bleed = model.layout.bleed
         let card = cardSize
-        let cardFrame = dock.placement.frame(contentSize: card, in: screen.visibleFrame)
+        let wasVisible = panel.isVisible
+
+        // A panel that comes back after being ordered out (an unplugged display, fullscreen)
+        // reappears the way it left: an auto-hiding dock comes back hidden rather than
+        // flashing open.
+        if dock.isEnabled && !wasVisible {
+            isRevealed = !dock.behavior.autoHide
+        }
+
+        // Display changes re-seat the window while the dock is already hidden, so the frame
+        // has to follow `isRevealed`. Parking the window back at its revealed spot without
+        // flipping the state leaves a dock that is visibly open but believes it is hidden,
+        // and only a pointer move resyncs the two.
+        let cardFrame = isRevealed
+            ? dock.placement.frame(contentSize: card, in: screen.visibleFrame)
+            : dock.placement.hiddenFrame(contentSize: card, in: screen.visibleFrame)
         let windowFrame = cardFrame.insetBy(dx: -bleed, dy: -bleed)
 
         surface.cardRect = NSRect(x: bleed, y: bleed, width: card.width, height: card.height)
 
-        if panel.isVisible && isRevealed {
+        if wasVisible && isRevealed {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.16
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
@@ -101,7 +116,6 @@ final class DockWindowController: NSObject {
         if dock.isEnabled && !panel.isVisible {
             panel.alphaValue = 1
             panel.orderFrontRegardless()
-            isRevealed = true
         }
         if !dock.isEnabled {
             panel.orderOut(nil)
