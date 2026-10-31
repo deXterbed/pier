@@ -345,14 +345,85 @@ final class DockWindowController: NSObject {
 
     // MARK: - Menus
 
+    /// What right-clicking shows. A tile offers the actions the macOS Dock offers for that
+    /// item; the dock's own settings live on the background, the way the system Dock does it.
     func contextMenu(forItemAt index: Int?) -> NSMenu {
-        let menu = NSMenu()
+        guard let index, index < model.items.count else { return dockMenu() }
+        let item = model.items[index]
+        switch item.kind {
+        case .app: return appMenu(for: item)
+        case .folder, .file: return fileMenu(for: item)
+        case .widget: return dockMenu()
+        }
+    }
 
-        if let index, index < dock.items.count {
-            let item = dock.items[index]
-            addItemEntries(to: menu, for: item)
+    private func appMenu(for item: DockItem) -> NSMenu {
+        let menu = NSMenu()
+        let app = AppCatalog.shared.runningApplication(for: item)
+
+        add(to: menu, item.title) { AppCatalog.shared.activate(item) }
+        if let app {
+            add(to: menu, "Show All Windows", "rectangle.on.rectangle") {
+                _ = app.activate(options: [.activateAllWindows])
+            }
+        }
+        menu.addItem(.separator())
+
+        if let app {
+            if app.isHidden {
+                add(to: menu, "Show", "eye") { _ = app.unhide() }
+            } else {
+                add(to: menu, "Hide", "eye.slash") { _ = app.hide() }
+            }
+            add(to: menu, "Quit", "xmark.circle") { AppCatalog.shared.quit(item) }
             menu.addItem(.separator())
         }
+
+        let options = NSMenu()
+        add(to: options, "Show in Finder", "folder") { [weak self] in self?.showInFinder(item) }
+        add(to: options, "Change Icon…", "photo") { [weak self] in self?.changeIcon(of: item) }
+        if item.customIconPath != nil {
+            add(to: options, "Reset Icon", "arrow.uturn.backward") { [weak self] in self?.resetIcon(of: item) }
+        }
+        if isPinned(item) {
+            add(to: options, "Remove from Dock", "minus.circle") { [weak self] in self?.removeItem(item) }
+        } else {
+            add(to: options, "Keep in Dock", "pin") { [weak self] in self?.addItems([item]) }
+        }
+        if app != nil {
+            add(to: options, "Force Quit", "exclamationmark.octagon") {
+                AppCatalog.shared.quit(item, force: true)
+            }
+        }
+        let optionsItem = NSMenuItem(title: "Options", action: nil, keyEquivalent: "")
+        optionsItem.submenu = options
+        menu.addItem(optionsItem)
+
+        // A dock sized to its contents leaves almost no background to right-click, so the
+        // dock's own actions need a home that isn't the empty space around the tiles.
+        menu.addItem(.separator())
+        let dockItem = NSMenuItem(title: "Dock", action: nil, keyEquivalent: "")
+        dockItem.submenu = dockMenu()
+        menu.addItem(dockItem)
+        return menu
+    }
+
+    private func fileMenu(for item: DockItem) -> NSMenu {
+        let menu = NSMenu()
+        add(to: menu, "Open", "arrow.up.forward.app") { AppCatalog.shared.activate(item) }
+        add(to: menu, "Show in Finder", "folder") { [weak self] in self?.showInFinder(item) }
+        menu.addItem(.separator())
+        add(to: menu, "Change Icon…", "photo") { [weak self] in self?.changeIcon(of: item) }
+        if item.customIconPath != nil {
+            add(to: menu, "Reset Icon", "arrow.uturn.backward") { [weak self] in self?.resetIcon(of: item) }
+        }
+        add(to: menu, "Remove from Dock", "minus.circle") { [weak self] in self?.removeItem(item) }
+        return menu
+    }
+
+    private func dockMenu() -> NSMenu {
+        let menu = NSMenu()
+
 
         // A list of what's installed, rather than a file picker — an accessory app's
         // modal panels have a habit of opening behind whatever you were looking at.
@@ -414,42 +485,29 @@ final class DockWindowController: NSObject {
         return menu
     }
 
-    private func addItemEntries(to menu: NSMenu, for item: DockItem) {
-        if item.isInteractive {
-            add(to: menu, "Open", "arrow.up.forward.app") {
-                AppCatalog.shared.activate(item)
-            }
+    /// A pinned item is stored on the dock; anything else is one of the running apps shown
+    /// alongside them, so it can be pinned rather than removed.
+    private func isPinned(_ item: DockItem) -> Bool {
+        dock.items.contains { $0.id == item.id }
+    }
+
+    private func showInFinder(_ item: DockItem) {
+        guard let url = item.url else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([url])
+    }
+
+    private func resetIcon(of item: DockItem) {
+        store.update(id: dockID) { dock in
+            guard let index = dock.items.firstIndex(where: { $0.id == item.id }) else { return }
+            dock.items[index].customIconPath = nil
         }
-        if item.url != nil {
-            add(to: menu, "Show in Finder", "folder") {
-                guard let url = item.url else { return }
-                NSWorkspace.shared.activateFileViewerSelecting([url])
-            }
-        }
-        if item.kind == .app, AppCatalog.shared.isRunning(item) {
-            add(to: menu, "Quit", "xmark.circle") { AppCatalog.shared.quit(item) }
-            add(to: menu, "Force Quit", "exclamationmark.octagon") {
-                AppCatalog.shared.quit(item, force: true)
-            }
-        }
-        if item.kind != .widget {
-            add(to: menu, "Change Icon…", "photo") { [weak self] in self?.changeIcon(of: item) }
-            if item.customIconPath != nil {
-                add(to: menu, "Reset Icon", "arrow.uturn.backward") { [weak self] in
-                    self?.store.update(id: self?.dockID ?? UUID()) { dock in
-                        guard let index = dock.items.firstIndex(where: { $0.id == item.id }) else { return }
-                        dock.items[index].customIconPath = nil
-                    }
-                    AppCatalog.shared.forgetIcons()
-                    self.map { $0.host?.dockChanged($0) }
-                }
-            }
-        }
-        add(to: menu, "Remove from Dock", "minus.circle") { [weak self] in
-            guard let self else { return }
-            self.store.update(id: self.dockID) { $0.remove(id: item.id) }
-            self.host?.dockChanged(self)
-        }
+        AppCatalog.shared.forgetIcons()
+        host?.dockChanged(self)
+    }
+
+    private func removeItem(_ item: DockItem) {
+        store.update(id: dockID) { $0.remove(id: item.id) }
+        host?.dockChanged(self)
     }
 
     // MARK: - Adding things
@@ -493,11 +551,18 @@ final class DockWindowController: NSObject {
         (sender.representedObject as? Block)?.run()
     }
 
-    private func add(to menu: NSMenu, _ title: String, _ symbol: String, _ action: @escaping () -> Void) {
+    private func add(
+        to menu: NSMenu,
+        _ title: String,
+        _ symbol: String? = nil,
+        _ action: @escaping () -> Void
+    ) {
         let entry = NSMenuItem(title: title, action: #selector(runBlock(_:)), keyEquivalent: "")
         entry.target = self
         entry.representedObject = Block(action)
-        entry.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        if let symbol {
+            entry.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        }
         menu.addItem(entry)
     }
 }

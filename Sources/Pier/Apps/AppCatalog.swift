@@ -152,15 +152,20 @@ final class AppCatalog: ObservableObject {
 
     // MARK: - Doing things
 
+    /// The running instance behind an app on the dock, if there is one.
+    func runningApplication(for item: DockItem) -> NSRunningApplication? {
+        guard item.kind == .app else { return nil }
+        guard let bundleID = item.bundleIdentifier ?? item.url.flatMap(bundleIdentifier(forAppAt:))
+        else { return nil }
+        return NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first(where: { $0.activationPolicy == .regular })
+    }
+
     /// Click behaviour: launch it, or bring it forward if it's already up.
     func activate(_ item: DockItem) {
         guard let url = item.url else { return }
 
-        if item.kind == .app,
-           let bundleID = item.bundleIdentifier ?? bundleIdentifier(forAppAt: url),
-           let running = NSRunningApplication
-            .runningApplications(withBundleIdentifier: bundleID)
-            .first(where: { $0.activationPolicy == .regular }) {
+        if let running = runningApplication(for: item) {
             running.activate(options: [.activateAllWindows])
             return
         }
