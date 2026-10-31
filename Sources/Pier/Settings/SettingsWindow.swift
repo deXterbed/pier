@@ -132,6 +132,7 @@ private struct GeneralSettings: View {
     @State private var onlyWithMultipleDisplays = Preferences.shared.onlyWithMultipleDisplays
     @State private var startAtLogin = LaunchAtLogin.isEnabled
     @State private var notificationBadges = Preferences.shared.notificationBadges
+    @State private var badgeSize = Preferences.shared.badgeSize
 
     var body: some View {
         Form {
@@ -147,6 +148,18 @@ private struct GeneralSettings: View {
 
             Section("Notifications") {
                 Toggle("Show notification badges", isOn: badgesBinding)
+                if notificationBadges {
+                    LabeledContent("Badge size") {
+                        HStack(spacing: 8) {
+                            Slider(value: badgeSizeBinding, in: 0.2...0.6, step: 0.02)
+                                .frame(width: 190)
+                            Text("\(Int((badgeSize * 100).rounded()))%")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .frame(width: 42, alignment: .trailing)
+                        }
+                    }
+                }
                 Text(notificationBadges
                     ? "Badges are read from the Dock, the only place macOS keeps them, so if they stay blank grant Pier Accessibility in System Settings > Privacy & Security > Accessibility."
                     : "Reads unread counts from the Dock's notification badges. That needs Accessibility permission, so it stays off until you turn it on.")
@@ -174,6 +187,16 @@ private struct GeneralSettings: View {
                     NotificationBadges.requestTrust()
                 }
                 AppCatalog.shared.startBadgePolling()
+            }
+        )
+    }
+
+    private var badgeSizeBinding: Binding<Double> {
+        Binding(
+            get: { badgeSize },
+            set: { newValue in
+                badgeSize = newValue
+                Preferences.shared.badgeSize = newValue
             }
         )
     }

@@ -40,7 +40,7 @@ struct DockTileView: View {
         }
         .overlay(alignment: .topTrailing) {
             if let badge = catalog.badge(for: item) {
-                BadgeLabel(text: badge, side: side)
+                BadgeLabel(text: badge, side: side, scale: Preferences.shared.badgeSize)
                     .offset(x: side * 0.04, y: -side * 0.04)
             }
         }
@@ -137,19 +137,29 @@ private struct RunningDot: View {
 private struct BadgeLabel: View {
     let text: String
     let side: CGFloat
+    /// Diameter as a fraction of the icon, from the settings.
+    let scale: Double
+
+    /// The Dock draws a single character as a circle and anything longer as a capsule. An app
+    /// that wants a plain dot sets its badge to "\u{2022}", so without the circle a dot badge
+    /// comes out as a pill with a speck in it.
+    private var isDot: Bool { text.count == 1 }
+    private var height: CGFloat { side * CGFloat(min(max(scale, 0.16), 0.6)) }
 
     var body: some View {
         Text(text)
-            .font(.system(size: max(7, side * 0.22), weight: .semibold))
+            .font(.system(size: height * (isDot ? 0.80 : 0.62), weight: .semibold))
             .monospacedDigit()
             .foregroundStyle(.white)
             .lineLimit(1)
-            .padding(.horizontal, max(3, side * 0.07))
-            .padding(.vertical, max(0.5, side * 0.012))
-            .frame(minWidth: side * 0.28)
+            .padding(.horizontal, isDot ? 0 : height * 0.32)
+            .frame(minWidth: height, minHeight: height)
             .background {
-                Capsule(style: .continuous)
-                    .fill(Color(nsColor: .systemRed))
+                if isDot {
+                    Circle().fill(Color(nsColor: .systemRed))
+                } else {
+                    Capsule(style: .continuous).fill(Color(nsColor: .systemRed))
+                }
             }
             .shadow(color: .black.opacity(0.30), radius: 1, y: 0.5)
             .allowsHitTesting(false)

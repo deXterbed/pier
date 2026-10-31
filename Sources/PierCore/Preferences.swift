@@ -19,6 +19,7 @@ public final class Preferences: @unchecked Sendable {
             Key.confirmedFirstRun: false,
             Key.onlyWithMultipleDisplays: true,
             Key.notificationBadges: false,
+            Key.badgeSize: 0.36,
         ])
     }
 
@@ -29,6 +30,7 @@ public final class Preferences: @unchecked Sendable {
         static let confirmedFirstRun = "confirmedFirstRun"
         static let onlyWithMultipleDisplays = "onlyWithMultipleDisplays"
         static let notificationBadges = "notificationBadges"
+        static let badgeSize = "badgeSize"
     }
 
     public var showMenuBarIcon: Bool {
@@ -55,6 +57,13 @@ public final class Preferences: @unchecked Sendable {
     public var notificationBadges: Bool {
         get { defaults.bool(forKey: Key.notificationBadges) }
         set { write(newValue, Key.notificationBadges) }
+    }
+
+    /// How big a notification badge is, as a fraction of the icon it sits on. The Dock's own
+    /// badges are about a third of the tile.
+    public var badgeSize: Double {
+        get { defaults.double(forKey: Key.badgeSize) }
+        set { write(newValue, Key.badgeSize) }
     }
 
     public var confirmedFirstRun: Bool {
